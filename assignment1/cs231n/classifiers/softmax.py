@@ -43,26 +43,26 @@ def softmax_loss_naive(W, X, y, reg):
 
         correct_exp = np.exp(correct)
         scores_exp = np.exp(scores)
-
         exp_sum = np.sum(scores_exp)
-        exp_sum = exp_sum - correct_exp
 
         loss_i = - np.log(correct_exp/exp_sum)
         loss += loss_i
 
-        dW[:,y[i]] += -(exp_sum - correct_exp)/exp_sum * X[i]
-        #dW[:,y[i]] += -correct_exp * X[i]
+        #dW[:,y[i]] -= (1 - (correct_exp/exp_sum)) * X[i]
         for j in range(num_classes):
             if j == y[i]:
-                continue
-            dW[:,j] += np.exp(scores[j]) / exp_sum * X[i]
+                dW[:,j] -= (1 - (correct_exp/exp_sum)) * X[i]
+
+            else:
+                dW[:, j] -= 0 - (scores_exp[j] / exp_sum) * X[i]
 
     loss /= num_train
     loss += reg * np.sum(W*W)
-    pass
+
     dW /= num_train
     dW += 2*reg*W
 
+    pass
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     return loss, dW
@@ -81,6 +81,7 @@ def softmax_loss_vectorized(W, X, y, reg):
     num_classes = W.shape[1]
 
     scores = X.dot(W)
+    scores -= np.max(scores)
     exps = np.exp(scores)
     correct = scores[np.arange(num_train),y]
     correct_exp = np.exp(correct)
@@ -90,6 +91,13 @@ def softmax_loss_vectorized(W, X, y, reg):
     loss /= num_train
     loss += reg*np.sum(W*W)
 
+    exps_sum = np.expand_dims(exps_sum,axis=1)
+    mult = exps/exps_sum
+    mult[np.arange(num_train),y] -= 1
+    dW = X.T.dot(mult)
+    dW /= num_train
+    dW += 2*reg*W
+    #print(e.shape)
 
     #############################################################################
     # TODO: Compute the softmax loss and its gradient using no explicit loops.  #

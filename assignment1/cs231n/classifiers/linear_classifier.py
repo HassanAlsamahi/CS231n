@@ -57,8 +57,9 @@ class LinearClassifier(object):
             #########################################################################
             # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
             indices = list(range(num_train))
-            X_batch = X[np.random.choice(num_train,size=batch_size,replace=False)]
-            y_batch = y[np.random.choice(num_train,size=batch_size,replace=False)]
+            index = np.random.choice(num_train,size=batch_size,replace=False)
+            X_batch = X[index]
+            y_batch = y[index]
             pass
 
             # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -77,10 +78,10 @@ class LinearClassifier(object):
             pass
 
             # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+            '''
             if verbose and it % 100 == 0:
                 print('iteration %d / %d: loss %f' % (it, num_iters, loss))
-
+            '''
         return loss_history
 
     def predict(self, X):

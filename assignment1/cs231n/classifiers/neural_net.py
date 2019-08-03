@@ -72,9 +72,11 @@ class TwoLayerNet(object):
         N, D = X.shape
 
         # Compute the forward pass
-        scores = X.dot(W1) + b1
-        scores = np.maximum(0,scores)
-        scores = scores.dot(W2) + b2
+        scores0 = X.dot(W1) + b1
+        Relu_scores = np.maximum(0,scores0)
+        scores = Relu_scores.dot(W2) + b2
+
+
         #############################################################################
         # TODO: Perform the forward pass, computing the class scores for the input. #
         # Store the result in the scores variable, which should be an array of      #
@@ -103,7 +105,9 @@ class TwoLayerNet(object):
 
         correct = scores[np.arange(N),y]
         correct_exp = np.exp(correct)
+
         scores_exp = np.exp(scores)
+
         exp_sum = np.sum(scores_exp,axis=1)
         loss = -np.log(correct_exp/exp_sum)
         loss = np.sum(loss)
@@ -122,8 +126,34 @@ class TwoLayerNet(object):
         # grads['W1'] should store the gradient on W1, and be a matrix of same size #
         #############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-        grads['W1'] = 
+        exp_sum = np.expand_dims(exp_sum,axis=1)
 
+
+        scores_softmax = scores_exp/exp_sum
+
+
+        scores_softmax[np.arange(N),y] -= 1
+
+        dRelu = W2.dot(scores_softmax.T)
+        dscores = (Relu_scores > 0) * dRelu.T
+
+        dW1 = X.T.dot(dscores)
+        dW2 = Relu_scores.T.dot(scores_softmax)
+
+
+        dB1 = dscores.sum(axis=0)
+        dB2 = np.sum(scores_softmax,0)
+
+        dB1 /= N
+        dB2 /= N
+
+        dW1 = (dW1/N) + 2*reg*W1
+        dW2 = (dW2/N) + 2*reg*W2
+
+        grads['W1'] = dW1
+        grads['W2'] = dW2
+        grads['b1'] = dB1
+        grads["b2"] = dB2
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -168,7 +198,9 @@ class TwoLayerNet(object):
             # them in X_batch and y_batch respectively.                             #
             #########################################################################
             # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+            indices = np.random.choice(num_train, size=batch_size)
+            X_batch = X[indices]
+            y_batch = y[indices]
             pass
 
             # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -184,6 +216,12 @@ class TwoLayerNet(object):
             # stored in the grads dictionary defined above.                         #
             #########################################################################
             # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+            W1,b1 = self.params['W1'],self.params['b1']
+            W2,b2 = self.params['W2'], self.params['b2']
+            W1 -= learning_rate*grads['W1']
+            W2 -= learning_rate*grads['W2']
+            b1 -= learning_rate*grads['b1']
+            b2 -= learning_rate*grads['b2']
 
             pass
 
@@ -230,6 +268,13 @@ class TwoLayerNet(object):
         # TODO: Implement this function; it should be VERY simple!                #
         ###########################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+
+        W1,b1 = self.params['W1'],self.params['b1']
+        W2,b2 = self.params['W2'],self.params['b2']
+        scores = X.dot(W1) + b1
+        relu_scores = np.maximum(0,scores)
+        scores = relu_scores.dot(W2) + b2
+        y_pred = np.argmax(scores,axis=1)
 
         pass
 

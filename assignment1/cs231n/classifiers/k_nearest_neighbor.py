@@ -78,8 +78,6 @@ class KNearestNeighbor(object):
                 # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
                 dists[i,j] = np.sum(np.abs(np.subtract(X[i,:],self.X_train[j,:])))
                 dists[i,j] = np.sqrt(np.sum(np.square(np.subtract(X[i,:],self.X_train[j,:]))))
-                #dists[i,j] = np.linalg.norm(self.X_train[j] - X[i])
-                #print(dists[i,j])
                 pass
 
                 # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
