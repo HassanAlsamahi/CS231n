@@ -51,9 +51,16 @@ class ThreeLayerConvNet(object):
         # IMPORTANT: For this assignment, you can assume that the padding          #
         # and stride of the first convolutional layer are chosen so that           #
         # **the width and height of the input are preserved**. Take a look at      #
-        # the start of the loss() function to see how that happens.                #                           
+        # the start of the loss() function to see how that happens.                #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        self.params['W1'] = np.random.normal(0.0,weight_scale,size=(num_filters,input_dim[0],filter_size,filter_size))
+        self.params['W2'] = np.random.normal(0.0,weight_scale,size=(int(input_dim[1]/2)*int(input_dim[2]/2)*num_filters,hidden_dim))
+        self.params['W3'] = np.random.normal(0.0,weight_scale,size=(hidden_dim,num_classes))
+
+        self.params['b1'] = np.zeros(num_filters)
+        self.params['b2'] = np.zeros(hidden_dim)
+        self.params['b3'] = np.zeros(num_classes)
 
         pass
 
@@ -95,6 +102,12 @@ class ThreeLayerConvNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
+        out,conv_cache = conv_relu_pool_forward(X,W1,b1,conv_param,pool_param)
+        N,C,H,W = out.shape
+        out = out.reshape(out.shape[0],-1)
+        scores,aff_cache1 = affine_forward(out,W2,b2)
+        relu_out,relu_cache = relu_forward(scores)
+        scores,aff_cache2 = affine_forward(relu_out,W3,b3)
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -117,7 +130,34 @@ class ThreeLayerConvNet(object):
         # of 0.5 to simplify the expression for the gradient.                      #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        num_train = X.shape[0]
+        exp_scores = np.exp(scores)
+        exp_sum = np.sum(exp_scores,axis=1)
 
+        correct_exp = exp_scores[np.arange(num_train),y]
+        loss = -np.log(correct_exp/exp_sum)
+        loss = np.sum(loss)
+        loss /= num_train
+        loss += self.reg * (np.sum(W1*W1) + np.sum(W2*W2) + np.sum(W3*W3)) * 0.5
+
+
+        #Gradients
+        exp_sum = np.expand_dims(exp_sum,axis=1)
+        softmax = exp_scores/exp_sum
+        dout = softmax
+        dout[np.arange(num_train),y] -= 1
+        dx,dw3,db3 = affine_backward(dout,aff_cache2)
+        dscores = relu_backward(dx,relu_cache)
+        dout,dw2,db2 = affine_backward(dscores,aff_cache1)
+        dout = dout.reshape((N,C,H,W))
+        dx,dw1,db1 = conv_relu_pool_backward(dout,conv_cache)
+
+        grads['W1'] = dw1
+        grads['b1'] = db1
+        grads['b2'] = db2
+        grads['W2'] = dw2
+        grads['b3'] = db3
+        grads['W3'] = dw3
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****

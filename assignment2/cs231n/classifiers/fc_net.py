@@ -227,17 +227,19 @@ class FullyConnectedNet(object):
         # parameters should be initialized to zeros.                               #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-        w1 = np.random.normal(0.0,weight_scale,size=(input_dim,hidden_dims[0]))
-        w2 = np.random.normal(0.0,weight_scale,size=(hidden_dims[0],hidden_dims[1]))
-        w3 = np.random.normal(0.0,weight_scale,size=(hidden_dims[1],num_classes))
+        network_layers = np.hstack([input_dim,hidden_dims,num_classes])
+        for i in range(self.num_layers):
+            self.params['W'+str(i+1)] = np.random.normal(0.0,weight_scale,size=(network_layers[i],network_layers[i+1]))
+
+        for i in range(self.num_layers):
+            self.params['b'+str(i+1)] = np.zeros(network_layers[i+1])
 
 
-        b1 = np.zeros(hidden_dims[0])
-        b2 = np.zeros(hidden_dims[1])
-        b3 = np.zeros(num_classes)
+        if self.normalization != None:
+            for i in range(self.num_layers - 1):
+                self.params['gamma'+str(i+1)] = np.ones(network_layers[i+1])
+                self.params['beta'+str(i+1)] = np.zeros(network_layers[i+1])
 
-        self.params['W1'],self.params['W2'], self.params['W3'] = w1,w2,w3
-        self.params['b1'],self.params['b2'],self.params['b3'] = b1,b2,b3
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -263,8 +265,7 @@ class FullyConnectedNet(object):
         if self.normalization=='batchnorm':
             self.bn_params = [{'mode': 'train'} for i in range(self.num_layers - 1)]
         if self.normalization=='layernorm':
-            self.bn_params = [{} for i in range(self.num_layers - 1)]
-
+            self.bn_params = [{} for i in range(self.num_layers )]
         # Cast all parameters to the correct datatype
         for k, v in self.params.items():
             self.params[k] = v.astype(dtype)
@@ -301,11 +302,32 @@ class FullyConnectedNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         X = X.reshape(X.shape[0],-1)
-        scores0 = X.dot(self.params['W1']) + self.params['b1']
-        relu_scores0 = np.maximum(0,scores0)
-        scores1 = relu_scores0.dot(self.params['W2']) + self.params['b2']
-        relu_scores1 = np.maximum(0,scores1)
-        scores = relu_scores1.dot(self.params['W3']) + self.params['b3']
+        caches = []
+        relu_caches = []
+        batch_caches = []
+        relu_scores = [X]
+        drop_caches = []
+        for i in range(self.num_layers):
+            scores,cache = affine_forward(X,self.params['W'+str(i+1)],self.params['b'+str(i+1)])
+            if self.normalization != None:
+                if i < self.num_layers - 1: #(2)
+                    out,batch_cache = batchnorm_forward(scores,self.params['gamma'+str(i+1)],self.params['beta'+str(i+1)],self.bn_params[i])
+                    batch_caches.append(batch_cache)
+                    x,mean,x_mean,sq,var,var_eps,var_eps_inv,eps,scores,gamma,beta = batch_cache
+            if i < self.num_layers - 1:
+                if self.use_dropout:
+
+                        scores,drop_cache = dropout_forward(scores, self.dropout_param)
+                        drop_caches.append(drop_cache)
+                else:
+                    scores,relu_cache = relu_forward(scores)
+                    relu_caches.append(relu_cache)
+                X = scores
+                caches.append(cache)
+
+                relu_scores.append(scores)
+
+
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -339,7 +361,10 @@ class FullyConnectedNet(object):
         loss = - np.log(correct_exp/exp_sum)
         loss = np.sum(loss)
         loss /= num_train
-        loss += self.reg * (np.sum(self.params['W1'] * self.params['W1']) + np.sum(self.params['W2'] * self.params['W2']) + np.sum(self.params['W3'] * self.params['W3'])) * 0.5
+        params = 0
+        for i in range(self.num_layers):
+            params += np.sum(self.params['W'+str(i+1)] * self.params['W'+str(i+1)])
+        loss += self.reg  * 0.5 * params
 
         pass
 
@@ -348,44 +373,37 @@ class FullyConnectedNet(object):
         exp_sum = np.expand_dims(exp_sum,axis=1)
         softmax = exp_scores/exp_sum
         softmax[np.arange(num_train),y] -= 1
-        db3 = np.sum(softmax,axis=0)/num_train
-        #W3 Gradients
-        dw3 = relu_scores1.T.dot(softmax)
-        dw3 /= num_train
-        dw3 += 2 * self.reg * self.params['W3'] * 0.5
+        dx = softmax
 
+        for i in range(self.num_layers,0,-1):
+            if self.normalization != None:
+                if i != self.num_layers:
+                    if i >= 0:
+                        #print(batch_caches[i-1])
+                        dx,dgamma,dbeta = batchnorm_backward(dout,batch_caches[i-1])
+                        grads['gamma'+str(i)] = dgamma
+                        grads['beta'+str(i)] = dbeta
+            grads['b'+str(i)] = np.sum(dx,axis=0)/num_train
+            grads['W'+str(i)] = relu_scores[i-1].T.dot(dx)
+            grads['W'+str(i)] /= num_train
+            grads['W'+str(i)] += 2*self.reg * self.params['W'+str(i)] * 0.5
 
-        #b2 Gradients
-        drelu1 = self.params['W3'].dot(softmax.T)
-        dscores = (relu_scores1 > 0) * drelu1.T
-        db2 = (np.sum(dscores,axis=0))/num_train
-        #W2 gradients
-        dw2 = relu_scores0.T.dot(dscores)
-        dw2 /= num_train
-        dw2 += 2 * self.reg * self.params['W2'] * 0.5
+            if i >= 2:
+                if self.use_dropout:
+                    drelu = self.params['W'+str(i)].dot(dx.T)
+                    drelu = dropout_backward(drelu.T,drop_caches[i-2])
+                    dscores = (relu_scores[i-1] > 0) * drelu
+                    dout = dscores
+                else:
+                    drelu = self.params['W'+str(i)].dot(dx.T)
+                    dscores = (relu_scores[i-1] > 0) * drelu.T
+                    dout = dscores
 
-        #b1 Gradients
-        drelu2 = self.params['W2'].dot(dscores.T)
-        dscores2 = (relu_scores0 > 0) * drelu2.T
-        db1 = np.sum(dscores2,axis=0)/num_train
-        #W1 gradients
-        dw1 = X.T.dot(dscores2)
-        dw1 /= num_train
-        dw1 += 2*self.reg*self.params['W1'] * 0.5
+            if self.normalization == None:
+                dx = dout
 
-
-
-
-
-        grads['W1'] = dw1
-        grads['b1'] = db1
-        grads['W2'] = dw2
-        grads['b2']=db2
-        grads['W3'] = dw3
-        grads['b3'] = db3
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
-
         return loss, grads
