@@ -48,7 +48,6 @@ def softmax_loss_naive(W, X, y, reg):
         loss_i = - np.log(correct_exp/exp_sum)
         loss += loss_i
 
-        #dW[:,y[i]] -= (1 - (correct_exp/exp_sum)) * X[i]
         for j in range(num_classes):
             if j == y[i]:
                 dW[:,j] -= (1 - (correct_exp/exp_sum)) * X[i]
@@ -97,7 +96,7 @@ def softmax_loss_vectorized(W, X, y, reg):
     dW = X.T.dot(mult)
     dW /= num_train
     dW += 2*reg*W
-    #print(e.shape)
+
 
     #############################################################################
     # TODO: Compute the softmax loss and its gradient using no explicit loops.  #
