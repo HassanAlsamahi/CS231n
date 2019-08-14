@@ -143,9 +143,21 @@ class CaptioningRNN(object):
             h,rnn_cache = rnn_forward(out,h0,Wx,Wh,b)
             scores,temporal_cache = temporal_affine_forward(h,W_vocab,b_vocab)
             loss,dout = temporal_softmax_loss(scores,captions_out,mask)
+
             #Backward pass
             dx,grads['W_vocab'],grads['b_vocab'] = temporal_affine_backward(dout,temporal_cache)
             dx,dh0,grads['Wx'],grads['Wh'],grads['b'] = rnn_backward(dx,rnn_cache)
+            grads['W_embed'] = word_embedding_backward(dx,word_cache)
+            dx,grads['W_proj'],grads['b_proj'] = affine_backward(dh0,affine_cache)
+
+        elif self.cell_type == 'lstm':
+            h,lstm_cache = lstm_forward(out,h0,Wx,Wh,b)
+            scores,temporal_cache = temporal_affine_forward(h,W_vocab,b_vocab)
+            loss,dout = temporal_softmax_loss(scores,captions_out,mask)
+
+            #Backward pass
+            dx,grads['W_vocab'],grads['b_vocab'] = temporal_affine_backward(dout,temporal_cache)
+            dx,dh0,grads['Wx'],grads['Wh'],grads['b'] = lstm_backward(dx,lstm_cache)
             grads['W_embed'] = word_embedding_backward(dx,word_cache)
             dx,grads['W_proj'],grads['b_proj'] = affine_backward(dh0,affine_cache)
 
@@ -211,6 +223,24 @@ class CaptioningRNN(object):
         # functions; you'll need to call rnn_step_forward or lstm_step_forward in #
         # a loop.                                                                 #
         ###########################################################################
+        h0,affine_cache = affine_forward(features,W_proj,b_proj)
+        #out,word_cache = word_embedding_forward(captions,W_embed)
+        prev_c = np.zeros(h0.shape)
+        V,W = W_embed.shape
+        x = np.ones((N,W)) * W_embed[self._start]
+        for i in range(max_length):
+            if self.cell_type == 'rnn':
+                h,rnn_cache = rnn_step_forward(x,h0,Wx,Wh,b)
+            elif self.cell_type == 'lstm':
+                h,c,lstm_cache = lstm_step_forward(x,h0,prev_c,Wx,Wh,b)
+                prev_c = c
+
+            scores = h.dot(W_vocab) + b_vocab
+            max_scores = np.argmax(scores,axis=1)
+            captions[:,i] = max_scores
+            x = W_embed[max_scores]
+            h0 = h
+
         pass
         ############################################################################
         #                             END OF YOUR CODE                             #
