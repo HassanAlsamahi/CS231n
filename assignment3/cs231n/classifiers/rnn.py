@@ -224,7 +224,6 @@ class CaptioningRNN(object):
         # a loop.                                                                 #
         ###########################################################################
         h0,affine_cache = affine_forward(features,W_proj,b_proj)
-        #out,word_cache = word_embedding_forward(captions,W_embed)
         prev_c = np.zeros(h0.shape)
         V,W = W_embed.shape
         x = np.ones((N,W)) * W_embed[self._start]
